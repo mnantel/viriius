@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/tls"
+	"flag"
 	"fmt"
 	"log"
 	"net/http"
@@ -10,23 +11,32 @@ import (
 	bolt "go.etcd.io/bbolt"
 )
 
-const (
-	malshareAPIKey = "1d3e5832208312e0955491bc25b9fd5aff9e2d916e3dae4ba2d212b9f29e4e6d"
-	path           = "viriius.db"
-)
+// const (
+// 	malshareAPIKey = "1d3e5832208312e0955491bc25b9fd5aff9e2d916e3dae4ba2d212b9f29e4e6d"
+// 	path           = "viriius.db"
+// )
+
+// go run viriius.go -a 1d3e5832208312e0955491bc25b9fd5aff9e2d916e3dae4ba2d212b9f29e4e6d -p viriius.db -d
 
 var (
-	db *bolt.DB
+	db             *bolt.DB
+	malshareAPIKey = flag.String("a", "", "Malshare API key.")
+	path           = flag.String("p", "viriius.db", "Path to hash cache DB (will be created if non-existent).")
+	dryrun         = flag.Bool("d", false, "Dry run: display list of new hashes but dont download them.")
+	ignore         = flag.Bool("i", false, "Ignore existing hash list and download all new files.")
+	ssl            = flag.Bool("s", false, "Disable SSL certificate validation (useful when testing inline MITM inspection device).")
 )
 
 func main() {
+
+	flag.Parse()
 
 	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 
 	var err error
 	var conf *gomalshare.Client
 
-	db, err = bolt.Open(path, 0666, nil)
+	db, err = bolt.Open(*path, 0666, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -34,7 +44,7 @@ func main() {
 
 	initDb()
 
-	conf, err = gomalshare.New(malshareAPIKey, "https://malshare.com/") // Initiate new connection to API
+	conf, err = gomalshare.New(*malshareAPIKey, "https://malshare.com/") // Initiate new connection to API
 	if err != nil {
 		panic(err)
 	}
