@@ -91,9 +91,10 @@ func main() {
 					fmt.Printf("...%s %s\r\n", Red("ERROR"), Red(err))
 					continue
 				}
+				addHash(e.Md5)
 				fmt.Printf("...%s\r\n", Green("DOWNLOADED"))
+				continue
 			}
-			addHash(e.Md5)
 			fmt.Printf("...%s\r\n", Yellow("SKIP (DRYRUN)"))
 			continue
 		}
