@@ -26,7 +26,33 @@ var (
 	dryrun         = flag.Bool("d", false, "Dry run: display list of new hashes but dont download them.")
 	ignore         = flag.Bool("i", false, "Ignore existing hash list and download all new files.")
 	ssl            = flag.Bool("s", false, "Disable SSL certificate validation (useful when testing inline MITM inspection device).")
+	exists         = flag.Bool("e", false, "Output message for files that already exist.")
 )
+
+var (
+	Info = Teal
+	Warn = Yellow
+	Fata = Red
+)
+
+var (
+	Black   = Color("\033[1;30m%s\033[0m")
+	Red     = Color("\033[1;31m%s\033[0m")
+	Green   = Color("\033[1;32m%s\033[0m")
+	Yellow  = Color("\033[1;33m%s\033[0m")
+	Purple  = Color("\033[1;34m%s\033[0m")
+	Magenta = Color("\033[1;35m%s\033[0m")
+	Teal    = Color("\033[1;36m%s\033[0m")
+	White   = Color("\033[1;37m%s\033[0m")
+)
+
+func Color(colorString string) func(...interface{}) string {
+	sprint := func(args ...interface{}) string {
+		return fmt.Sprintf(colorString,
+			fmt.Sprint(args...))
+	}
+	return sprint
+}
 
 func main() {
 
@@ -54,19 +80,25 @@ func main() {
 	var list24 *[]gomalshare.HashList
 	list24, _ = conf.GetListOfHash24()
 	for i, e := range *list24 {
-		if existHash(e.Md5) == false || *ignore {
-			fmt.Print("Sample ", i, " MD5: ", e.Md5)
+		if existHash(e.Md5) && !*exists {
+			continue
+		}
+		fmt.Printf("Sample %d MD5: %s", i, e.Md5)
+		if !existHash(e.Md5) || *ignore {
 			if !*dryrun {
 				_, err := conf.DownloadFileFromHash(e.Md5)
 				if err != nil {
-					fmt.Println("...Error downloading hash: ", e.Md5)
+					fmt.Printf("...%s %s\r\n", Red("ERROR"), Red(err))
 					continue
 				}
-				fmt.Println("...OK! (downloaded)")
+				fmt.Printf("...%s\r\n", Green("DOWNLOADED"))
 			}
 			addHash(e.Md5)
-			fmt.Println("...OK! (skip download)")
+			fmt.Printf("...%s\r\n", Yellow("SKIP (DRYRUN)"))
+			continue
 		}
+		fmt.Printf("...%s\r\n", Purple("EXISTS"))
+
 	}
 
 }
