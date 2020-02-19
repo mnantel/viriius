@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/MonaxGT/gomalshare"
 	bolt "go.etcd.io/bbolt"
@@ -49,55 +50,28 @@ func main() {
 		panic(err)
 	}
 
+	fmt.Println("### ", time.Now(), " ###")
 	var list24 *[]gomalshare.HashList
 	list24, _ = conf.GetListOfHash24()
-	for _, e := range *list24 {
-		if existHash(e.Md5) == false {
-			fmt.Println(e.Md5)
-			_, err := conf.DownloadFileFromHash(e.Md5)
-			if err != nil {
-				fmt.Println("Error downloading hash: ", e.Md5)
-				continue
+	for i, e := range *list24 {
+		if existHash(e.Md5) == false || *ignore {
+			fmt.Print("Sample ", i, " MD5: ", e.Md5)
+			if !*dryrun {
+				_, err := conf.DownloadFileFromHash(e.Md5)
+				if err != nil {
+					fmt.Println("...Error downloading hash: ", e.Md5)
+					continue
+				}
+				fmt.Println("...OK! (downloaded)")
 			}
 			addHash(e.Md5)
+			fmt.Println("...OK! (skip download)")
 		}
 	}
 
-	// example with return list of types of downloading files last 24 hours
-	// typeCount, _ := conf.GetListOfTypesFile24()
-	// fmt.Println(typeCount)
-
-	// example with return current api key limit
-	// var limitKey *gomalshare.LimitKey
-	// limitKey, _ = conf.GetLimitKey()
-	// fmt.Println(limitKey)
-
-	// example with return information of files by using sample
-	// var search *[]gomalshare.SearchDetails
-	// search, err = conf.GetSearchResult("emotet")
-	// if err != nil {
-	// 	fmt.Println(err)
-	// }
-	// for _, v := range *search {
-	// 	fmt.Println(v.Md5)
-	// }
-	// example upload file
-	// filename := "test.test"
-	// err = conf.UploadFile(filename)
-	// if err != nil {
-	// 	fmt.Println(err)
-	// }
-
-	// // example for download file by hash request
-	// file, err := conf.DownloadFileFromHash("95bc3d64f49b03749427fcd6601fa8a7")
-	// if err != nil {
-	// 	fmt.Println(err)
-	// }
-	// fmt.Println(string(file))
 }
 
 func initDb() {
-
 	db.Update(func(tx *bolt.Tx) error {
 		_, err := tx.CreateBucketIfNotExists([]byte("hashes"))
 		if err != nil {
