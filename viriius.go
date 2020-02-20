@@ -112,11 +112,10 @@ func Color(colorString string) func(...interface{}) string {
 
 func main() {
 
-	loginFSA()
-
 	flag.Parse()
-	fmt.Println(*FSAIP, *FSAUsername, *FSAPasswd)
 	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+
+	loginFSA()
 
 	var err error
 	var conf *gomalshare.Client
