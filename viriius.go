@@ -175,17 +175,15 @@ func processSample(s *gomalshare.HashList) {
 		}
 		fmt.Printf("[%s]", Green("DOWNLOADED"))
 		addHash(s.Md5)
+		if *submittofsa {
+			submitFileFSA(&file, *s)
+			fmt.Printf("...%s", Magenta("FSA"))
+		}
 	}
 
 	// DRYRUN: if dryrun AND not exist
 	if *dryrun && !existHash(s.Md5) {
 		fmt.Printf("...%s", Yellow("DRYRUN"))
-	}
-
-	// SUBMIT TO FSA
-	if !*dryrun && !existHash(s.Md5) && *submittofsa {
-		submitFileFSA(&file, *s)
-		fmt.Printf("...%s", Magenta("FSA"))
 	}
 
 }
