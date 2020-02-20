@@ -17,15 +17,21 @@ import (
 )
 
 var (
-	db             *bolt.DB
+	fsaKey     string
+	fsaSession string
+
+	db *bolt.DB
+
 	malshareAPIKey = flag.String("a", "", "Malshare API key.")
 	path           = flag.String("p", "viriius.db", "Path to hash cache DB (will be created if non-existent).")
 	dryrun         = flag.Bool("d", false, "Dry run: display list of new hashes but dont download them.")
 	ignore         = flag.Bool("i", false, "Ignore existing hash list and download all new files.")
 	ssl            = flag.Bool("s", false, "Disable SSL certificate validation (useful when testing inline MITM inspection device).")
-	exists         = flag.Bool("e", false, "Output message for files that already exist.")
-	fsaKey         string
-	fsaSession     string
+	logexists      = flag.Bool("e", false, "Output message for files that already exist.")
+	submittofsa    = flag.Bool("f", false, "Submit to FSA.")
+	FSAIP          = flag.String("fip", "192.168.129.15", "FSA IP address.")
+	FSAUsername    = flag.String("fuser", "admin", "FSA Username.")
+	FSAPasswd      = flag.String("fpass", "password", "FSA Password.")
 )
 
 var (
@@ -107,8 +113,9 @@ func Color(colorString string) func(...interface{}) string {
 func main() {
 
 	loginFSA()
-	flag.Parse()
 
+	flag.Parse()
+	fmt.Println(*FSAIP, *FSAUsername, *FSAPasswd)
 	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 
 	var err error
@@ -130,28 +137,55 @@ func main() {
 	fmt.Println("### ", time.Now(), " ###")
 	var list24 *[]gomalshare.HashList
 	list24, _ = conf.GetListOfHash24()
-	for i, e := range *list24 {
-		if existHash(e.Md5) && !*exists {
-			continue
-		}
-		fmt.Printf("Sample %d MD5: %s", i, e.Md5)
-		if !existHash(e.Md5) || *ignore {
-			if !*dryrun {
-				file, err := conf.DownloadFileFromHash(e.Md5)
-				if err != nil {
-					fmt.Printf("...%s %s\r\n", Red("ERROR"), Red(err))
-					continue
-				}
-				addHash(e.Md5)
-				fmt.Printf("...%s\r\n", Green("DOWNLOADED"))
-				submitFileFSA(file, e)
-				continue
-			}
-			fmt.Printf("...%s\r\n", Yellow("SKIP (DRYRUN)"))
-			continue
-		}
-		fmt.Printf("...%s\r\n", Purple("EXISTS"))
+	for _, e := range *list24 {
+		processSample(&e)
+	}
 
+}
+
+func processSample(s *gomalshare.HashList) {
+
+	// EXIST AND NOT LOGGING EXIST AND NOT IGNORING - SKIP EVERYTHING
+	if existHash(s.Md5) && !*logexists && !*ignore {
+		return
+	}
+	defer fmt.Printf("\r\n")
+
+	// Otherwise start logging
+	fmt.Printf("Sample MD5: %s", s.Md5)
+
+	// EXISTS
+	if existHash(s.Md5) {
+		fmt.Printf("[%s]", Purple("EXISTS"))
+	}
+
+	// DOWNLOAD if not dryrun AND not exists
+	conf, err := gomalshare.New(*malshareAPIKey, "https://malshare.com/")
+	var file []byte
+	if !*dryrun && !existHash(s.Md5) {
+		// Initiate new connection to API
+		if err != nil {
+			fmt.Printf("[%s]", Red("APIERROR"))
+			return
+		}
+		file, err = conf.DownloadFileFromHash(s.Md5)
+		if err != nil {
+			fmt.Printf("...%s %s", Red("DLERROR"), Red(err))
+			return
+		}
+		fmt.Printf("[%s]", Green("DOWNLOADED"))
+		addHash(s.Md5)
+	}
+
+	// DRYRUN: if dryrun AND not exist
+	if *dryrun && !existHash(s.Md5) {
+		fmt.Printf("...%s", Yellow("DRYRUN"))
+	}
+
+	// SUBMIT TO FSA
+	if !*dryrun && !existHash(s.Md5) && *submittofsa {
+		submitFileFSA(&file, *s)
+		fmt.Printf("...%s", Magenta("FSA"))
 	}
 
 }
@@ -189,8 +223,8 @@ func existHash(hash string) bool {
 func loginFSA() {
 
 	fsaLoginData := apiFSALoginData{
-		User:   "admin",
-		Passwd: "FortiQc2012",
+		User:   *FSAUsername,
+		Passwd: *FSAPasswd,
 	}
 	fsaLoginParams := apiFSALoginParams{
 		URL: "/sys/login/user",
@@ -208,7 +242,8 @@ func loginFSA() {
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
 	client := &http.Client{Transport: tr}
-	reqURI := fmt.Sprintf("https://%s:%s/%s", "192.168.129.15", "443", "jsonrpc")
+
+	reqURI := fmt.Sprintf("https://%s:%s/%s", *FSAIP, "443", "jsonrpc")
 	req, err := http.NewRequest("POST", reqURI, bytes.NewBuffer(login))
 	if err != nil {
 		fmt.Println(err)
@@ -224,12 +259,12 @@ func loginFSA() {
 	fmt.Println(fsaSession)
 }
 
-func submitFileFSA(file []byte, meta gomalshare.HashList) bool {
+func submitFileFSA(file *[]byte, meta gomalshare.HashList) bool {
 
 	// enc := base64.StdEncoding.EncodeToString(file)
 
 	uploadParams := apiFSAUploadParams{
-		File:      base64.StdEncoding.EncodeToString(file),
+		File:      base64.StdEncoding.EncodeToString(*file),
 		Filename:  base64.StdEncoding.EncodeToString([]byte(meta.Md5)),
 		SkipSteps: "1,2,8",
 		URL:       "/alert/ondemand/submit-file",
@@ -250,7 +285,7 @@ func submitFileFSA(file []byte, meta gomalshare.HashList) bool {
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
 	client := &http.Client{Transport: tr}
-	reqURI := fmt.Sprintf("https://%s:%s/%s", "192.168.129.15", "443", "jsonrpc")
+	reqURI := fmt.Sprintf("https://%s:%s/%s", *FSAIP, "443", "jsonrpc")
 	req, err := http.NewRequest("POST", reqURI, bytes.NewBuffer(upload))
 	if err != nil {
 		fmt.Println(err)
