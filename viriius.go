@@ -162,7 +162,7 @@ func processSample(s *gomalshare.HashList) {
 	// DOWNLOAD if not dryrun AND not exists
 	conf, err := gomalshare.New(*malshareAPIKey, "https://malshare.com/")
 	var file []byte
-	if !*dryrun && !existHash(s.Md5) {
+	if !*dryrun && (!existHash(s.Md5) || *ignore) {
 		// Initiate new connection to API
 		if err != nil {
 			fmt.Printf("[%s]", Red("APIERROR"))
