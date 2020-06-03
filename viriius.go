@@ -137,7 +137,7 @@ func main() {
 
 	fmt.Println("### ", time.Now(), " ###")
 	var list24 *[]gomalshare.HashList
-	list24, _ = conf.GetListOfHash24()
+	list24, _ = conf.GetListOfHash24Type("PE32")
 	for _, e := range *list24 {
 		processSample(&e)
 	}
@@ -175,7 +175,7 @@ func processSample(s *gomalshare.HashList) {
 		}
 		fmt.Printf("[%s]", Green("DOWNLOADED"))
 		addHash(s.Md5)
-		err = ioutil.WriteFile(*storelocal+s.Md5, file, 0644)
+		err = ioutil.WriteFile(*storelocal+s.Md5+".exe", file, 0644)
 		if err == nil {
 			fmt.Printf("[%s]", Yellow("STOREDLOCAL"))
 		}
