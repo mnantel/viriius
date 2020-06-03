@@ -24,6 +24,7 @@ var (
 
 	malshareAPIKey = flag.String("a", "", "Malshare API key.")
 	path           = flag.String("p", "viriius.db", "Path to hash cache DB (will be created if non-existent).")
+	storelocal     = flag.String("l", "", "Download locally: create a copy of the file in target folder. Will not submit to FSA.")
 	dryrun         = flag.Bool("d", false, "Dry run: display list of new hashes but dont download them.")
 	ignore         = flag.Bool("i", false, "Ignore existing hash list and download all new files.")
 	ssl            = flag.Bool("s", false, "Disable SSL certificate validation (useful when testing inline MITM inspection device).")
@@ -144,6 +145,8 @@ func main() {
 
 func processSample(s *gomalshare.HashList) {
 
+	conf, err := gomalshare.New(*malshareAPIKey, "https://malshare.com/")
+	var file []byte
 	// EXIST AND NOT LOGGING EXIST AND NOT IGNORING - SKIP EVERYTHING
 	if existHash(s.Md5) && !*logexists && !*ignore {
 		return
@@ -158,9 +161,28 @@ func processSample(s *gomalshare.HashList) {
 		fmt.Printf("[%s]", Purple("EXISTS"))
 	}
 
+	// Download files locally
+	if !*dryrun && (!existHash(s.Md5) || *ignore) && *storelocal != "" {
+		if err != nil {
+			fmt.Printf("[%s]", Red("APIERROR"))
+			return
+		}
+		file, err = conf.DownloadFileFromHash(s.Md5)
+		if err != nil {
+			fmt.Printf("...%s %s", Red("DLERROR"), Red(err))
+			return
+		}
+		fmt.Printf("[%s]", Green("DOWNLOADED"))
+		addHash(s.Md5)
+		err = ioutil.WriteFile(*storelocal+s.Md5, file, 0644)
+		if err == nil {
+			fmt.Printf("[%s]", Yellow("STOREDLOCAL"))
+		}
+		return
+	}
+
 	// DOWNLOAD if not dryrun AND not exists
-	conf, err := gomalshare.New(*malshareAPIKey, "https://malshare.com/")
-	var file []byte
+
 	if !*dryrun && (!existHash(s.Md5) || *ignore) {
 		// Initiate new connection to API
 		if err != nil {
