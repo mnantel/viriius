@@ -35,6 +35,7 @@ var (
 	FSAPasswd      = flag.String("fpass", "password", "FSA Password.")
 )
 
+//
 var (
 	Info = Teal
 	Warn = Yellow
