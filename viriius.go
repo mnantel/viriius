@@ -30,6 +30,7 @@ var (
 	ssl            = flag.Bool("s", false, "Disable SSL certificate validation (useful when testing inline MITM inspection device).")
 	logexists      = flag.Bool("e", false, "Output message for files that already exist.")
 	submittofsa    = flag.Bool("f", false, "Submit to FSA.")
+	submittofai    = flag.Bool("z", false, "Enable FortiAI (specify key with fpass ")
 	FSAIP          = flag.String("fip", "192.168.129.15", "FSA IP address.")
 	FSAUsername    = flag.String("fuser", "admin", "FSA Username.")
 	FSAPasswd      = flag.String("fpass", "password", "FSA Password.")
@@ -74,6 +75,11 @@ type apiFSAUploadParams struct {
 	ArchivePassword string           `json:"archive_password"`
 	Meta            apiFSAUploadMeta `json:"meta"`
 	Timeout         string           `json:"timeout"`
+}
+
+type apiFAIUploadParams struct {
+	File     string `json:"file_content"`
+	Filename string `json:"file_name"`
 }
 
 type apiFSALogin struct {
@@ -201,6 +207,10 @@ func processSample(s *gomalshare.HashList) {
 			submitFileFSA(&file, *s)
 			fmt.Printf("...%s", Magenta("FSA"))
 		}
+		if *submittofai {
+			submitFileFAI(&file, *s)
+			fmt.Printf("...%s", Magenta("FAI"))
+		}
 	}
 
 	// DRYRUN: if dryrun AND not exist
@@ -279,6 +289,35 @@ func loginFSA() {
 	fmt.Println(fsaSession)
 }
 
+func submitFileFAI(file *[]byte, meta gomalshare.HashList) bool {
+
+	// enc := base64.StdEncoding.EncodeToString(file)
+
+	uploadParams := apiFAIUploadParams{
+		File:     base64.StdEncoding.EncodeToString(*file),
+		Filename: base64.StdEncoding.EncodeToString([]byte(meta.Md5)),
+	}
+
+	upload, err := json.Marshal(uploadParams)
+
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	client := &http.Client{Transport: tr}
+	reqURI := fmt.Sprintf("https://%s:%s/api/v1/files?access_token=%s", *FSAIP, "443", *FSAPasswd)
+	req, err := http.NewRequest("POST", reqURI, bytes.NewBuffer(upload))
+	if err != nil {
+		fmt.Println(err)
+	}
+	res, err := client.Do(req)
+	if err != nil {
+		log.Fatal(err)
+	}
+	resbody, _ := ioutil.ReadAll(res.Body)
+	fmt.Println(string(resbody))
+	return true
+}
+
 func submitFileFSA(file *[]byte, meta gomalshare.HashList) bool {
 
 	// enc := base64.StdEncoding.EncodeToString(file)
@@ -310,16 +349,10 @@ func submitFileFSA(file *[]byte, meta gomalshare.HashList) bool {
 	if err != nil {
 		fmt.Println(err)
 	}
-	res, err := client.Do(req)
+	_, err = client.Do(req)
 	if err != nil {
 		log.Fatal(err)
 	}
-	resbody, _ := ioutil.ReadAll(res.Body)
-	fmt.Println(string(resbody))
-	// var response apiFSALoginResponse
-	// _ = json.Unmarshal(resbody, &response)
-	// fsaSession = response.Session
-	// fmt.Println(fsaSession)
-
+	// resbody, _ := ioutil.ReadAll(res.Body)
 	return true
 }
