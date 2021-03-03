@@ -308,10 +308,12 @@ func submitFileFAI(file *[]byte, meta gomalshare.HashList) bool {
 	req, err := http.NewRequest("POST", reqURI, bytes.NewBuffer(upload))
 	if err != nil {
 		fmt.Println(err)
+		return false
 	}
 	res, err := client.Do(req)
 	if err != nil {
 		log.Fatal(err)
+		return false
 	}
 	resbody, _ := ioutil.ReadAll(res.Body)
 	fmt.Println(string(resbody))
