@@ -15,8 +15,12 @@ ignore         = flag.Bool("i", false, "Ignore existing hash list and download a
 ssl            = flag.Bool("s", false, "Disable SSL certificate validation (useful when testing inline MITM inspection device).")
 logexists      = flag.Bool("e", false, "Output message for files that already exist.")
 submittofsa    = flag.Bool("f", false, "Submit to FSA.")
+submittofai    = flag.Bool("z", false, "Submit to FAI.")
 FSAIP          = flag.String("fip", "192.168.129.15", "FSA IP address.")
 FSAUsername    = flag.String("fuser", "admin", "FSA Username.")
 FSAPasswd      = flag.String("fpass", "password", "FSA Password.")
 
+
+Usage example for FortiAI:
  
+go run viriius.go -a MALSHAREAPI --fip 192.168.129.17 --fuser admin --fpass somepassword -z -i
